@@ -2,9 +2,8 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { AppModule } from '../src/app.module';
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { ValidationPipe } from '@nestjs/common';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 let cachedServer: express.Express | null = null;
 let initializationError: Error | null = null;
@@ -75,7 +74,7 @@ async function bootstrap() {
   }
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: Request, res: Response) {
   try {
     if (!cachedServer) {
       await bootstrap();

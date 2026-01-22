@@ -322,16 +322,22 @@ export class MainController {
       free: [],
     };
 
-    const posts = await this.advertsService.getLastAds(
-      Number.isNaN(Number(limit)) ? 8 : Number(limit),
-      Number(offset) || 0,
-    );
+    try {
+      const posts = await this.advertsService.getLastAds(
+        Number.isNaN(Number(limit)) ? 8 : Number(limit),
+        Number(offset) || 0,
+      );
 
-    posts.map((entry: any) => {
-      if (categories[entry.db_category]) {
-        categories[entry.db_category].push(entry);
-      }
-    });
+      posts.map((entry: any) => {
+        if (categories[entry.db_category]) {
+          categories[entry.db_category].push(entry);
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching new ads:', error);
+      // Return empty categories instead of crashing
+      // This allows the frontend to still render even if DB is unavailable
+    }
 
     return categories;
   }

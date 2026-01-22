@@ -22,8 +22,8 @@ async function bootstrap() {
 
   app.enableCors({
     origin: process.env.NODE_ENV === 'production' 
-      ? process.env.ALLOWED_ORIGIN || 'https://kibtop.online'
-      : ['http://localhost:3000', 'http://localhost:3001', 'https://kibtop.online'],
+      ? process.env.ALLOWED_ORIGIN || 'http://localhost:3001'
+      : ['http://localhost:3001'],
     credentials: true,
   });
 

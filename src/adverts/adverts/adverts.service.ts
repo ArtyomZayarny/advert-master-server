@@ -99,18 +99,25 @@ export class AdvertsService {
   }
 
   async getLastAds(limit: number = 8, offset: number = 0): Promise<any[]> {
-    const docs = this.db
-      .collection('advs')
-      .find({})
-      .sort({ $natural: -1 })
-      .limit(limit)
-      .skip(offset);
+    try {
+      const docs = this.db
+        .collection('advs')
+        .find({})
+        .sort({ $natural: -1 })
+        .limit(limit)
+        .skip(offset);
 
-    const arr: any[] = [];
-    for await (const doc of docs) {
-      arr.push(doc);
+      const arr: any[] = [];
+      for await (const doc of docs) {
+        arr.push(doc);
+      }
+      return arr;
+    } catch (error) {
+      console.error('Error in getLastAds:', error);
+      // Return empty array if DB is unavailable
+      // This prevents the endpoint from crashing
+      return [];
     }
-    return arr;
   }
 
   async getAdvsByUserId(userId: string): Promise<any[]> {
