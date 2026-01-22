@@ -108,11 +108,24 @@ export class AppModule implements OnModuleInit {
 
   async onModuleInit() {
     // Initialize database table on startup
+    // In serverless environments, this might fail if DB is not available
+    // We catch and log but don't throw to allow the app to start
     try {
-      await this.userService.createTable();
+      await Promise.race([
+        this.userService.createTable(),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Table initialization timeout')), 10000)
+        ),
+      ]);
       console.log('✅ Users table initialized');
     } catch (error) {
-      console.error('❌ Failed to initialize users table:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('❌ Failed to initialize users table:', errorMessage);
+      // In serverless, we continue even if table creation fails
+      // The table will be created on first use if needed
+      if (process.env.REQUIRE_DB_INIT === 'true') {
+        throw error;
+      }
     }
   }
 }

@@ -19,6 +19,15 @@ async function createApp() {
   }
 
   try {
+    console.log('🚀 Starting NestJS app initialization...');
+    console.log('📊 Environment:', {
+      NODE_ENV: process.env.NODE_ENV,
+      VERCEL: process.env.VERCEL ? 'true' : 'false',
+      hasPostgres: !!process.env.POSTGRES_URL || !!process.env.POSTGRES_HOST,
+      hasMongo: !!process.env.MONGODB_URL,
+      hasRedis: !!process.env.REDIS_HOST,
+    });
+
     const expressApp = express();
     const adapter = new ExpressAdapter(expressApp);
     
@@ -26,6 +35,7 @@ async function createApp() {
       bodyParser: true,
       rawBody: true,
       logger: process.env.NODE_ENV === 'production' ? false : ['error', 'warn', 'log'],
+      abortOnError: false, // Don't abort on errors, allow graceful degradation
     });
 
     app.useGlobalPipes(
@@ -47,13 +57,26 @@ async function createApp() {
       credentials: true,
     });
 
-    await app.init();
+    // Add timeout for app initialization (30 seconds max for Vercel)
+    await Promise.race([
+      app.init(),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('App initialization timeout after 30s')), 30000)
+      ),
+    ]);
+
+    console.log('✅ NestJS app initialized successfully');
     cachedApp = expressApp;
     return expressApp;
   } catch (error) {
     // Cache the error so we don't retry on every request
     initializationError = error as Error;
-    console.error('❌ Failed to initialize NestJS app:', error);
+    const errorDetails = {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : 'Error',
+    };
+    console.error('❌ Failed to initialize NestJS app:', JSON.stringify(errorDetails, null, 2));
     throw error;
   }
 }

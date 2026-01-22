@@ -168,7 +168,10 @@ export const MONGODB_DATABASE = 'MONGODB_DATABASE';
           },
         });
 
-        client.on('error', (err) => console.error('Redis Client Error', err));
+        client.on('error', (err) => {
+          console.error('Redis Client Error:', err);
+          // Don't throw, just log - Redis errors shouldn't crash the app
+        });
 
         try {
           await Promise.race([
@@ -179,13 +182,15 @@ export const MONGODB_DATABASE = 'MONGODB_DATABASE';
           ]);
           console.log('✅ Redis connected');
         } catch (error) {
-          console.error('❌ Redis connection error:', error);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.error('❌ Redis connection error:', errorMessage);
           // In serverless environments, we might want to continue without Redis
           // Throw only if Redis is critical for the app to function
           if (process.env.REQUIRE_REDIS === 'true') {
             throw error;
           }
-          console.warn('⚠️  Continuing without Redis connection');
+          console.warn('⚠️  Continuing without Redis connection - Redis features will be unavailable');
+          // Still return the client - some operations might work with retries
         }
 
         return client;
@@ -212,19 +217,24 @@ export const MONGODB_DATABASE = 'MONGODB_DATABASE';
         });
 
         try {
-          await client.connect();
+          await Promise.race([
+            client.connect(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('MongoDB connection timeout')), 5000)
+            ),
+          ]);
           console.log('✅ MongoDB connected');
           return client;
         } catch (error) {
           console.error('❌ MongoDB connection error:', error);
-          // In serverless environments, connection failures might be temporary
-          // Only throw if MongoDB is required for the app to function
+          // In serverless environments, we should still return the client
+          // It will attempt to connect on first use (lazy connection)
+          // Only throw if MongoDB is absolutely required
           if (process.env.REQUIRE_MONGODB === 'true') {
             throw error;
           }
-          // For serverless, we might want to allow lazy connection
           console.warn('⚠️  MongoDB connection failed, will retry on first use');
-          // Still return the client - it will attempt to connect on first use
+          // Return the client anyway - MongoDB driver supports lazy connections
           return client;
         }
       },
