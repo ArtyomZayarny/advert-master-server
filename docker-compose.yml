@@ -1,0 +1,282 @@
+version: '3.8'
+
+services:
+  # Databases
+  postgres-auth:
+    image: postgres:15-alpine
+    container_name: advert-postgres-auth
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-advert}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-advert123}
+      POSTGRES_DB: ${POSTGRES_AUTH_DB:-advert_auth}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-auth-data:/var/lib/postgresql/data
+    networks:
+      - advert-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-advert}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-user:
+    image: postgres:15-alpine
+    container_name: advert-postgres-user
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-advert}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-advert123}
+      POSTGRES_DB: ${POSTGRES_USER_DB:-advert_user}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-user-data:/var/lib/postgresql/data
+    networks:
+      - advert-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-advert}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb-adverts:
+    image: mongo:7
+    container_name: advert-mongodb-adverts
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-advert}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-advert123}
+      MONGO_INITDB_DATABASE: ${MONGO_ADVERTS_DB:-advert_adverts}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-adverts-data:/data/db
+    networks:
+      - advert-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb-search:
+    image: mongo:7
+    container_name: advert-mongodb-search
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-advert}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-advert123}
+      MONGO_INITDB_DATABASE: ${MONGO_SEARCH_DB:-advert_search}
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodb-search-data:/data/db
+    networks:
+      - advert-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb-archive:
+    image: mongo:7
+    container_name: advert-mongodb-archive
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-advert}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-advert123}
+      MONGO_INITDB_DATABASE: ${MONGO_ARCHIVE_DB:-advert_archive}
+    ports:
+      - "27019:27017"
+    volumes:
+      - mongodb-archive-data:/data/db
+    networks:
+      - advert-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: advert-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - advert-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --requirepass ${REDIS_PASSWORD:-advert123}
+
+  # Auth Service
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: advert-auth-service
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - POSTGRES_URL=postgresql://${POSTGRES_USER:-advert}:${POSTGRES_PASSWORD:-advert123}@postgres-auth:5432/${POSTGRES_AUTH_DB:-advert_auth}
+      - POSTGRES_HOST=postgres-auth
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-advert}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-advert123}
+      - POSTGRES_DB=${POSTGRES_AUTH_DB:-advert_auth}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_USER=${REDIS_USER:-}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-advert123}
+      - SECRET=${JWT_SECRET:-your-secret-key}
+      - REFRESH_SECRET=${JWT_REFRESH_SECRET:-your-refresh-secret-key}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_BUCKET_NAME=${AWS_BUCKET_NAME:-kibtop}
+      - AWS_BUCKET_AVATARS=${AWS_BUCKET_AVATARS:-kibtop.avatars}
+      - WEBSOCKET_CHAT=${WEBSOCKET_CHAT:-}
+    depends_on:
+      postgres-auth:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - advert-network
+    restart: unless-stopped
+
+  # Adverts Service
+  adverts-service:
+    build:
+      context: ./services/adverts-service
+      dockerfile: Dockerfile
+    container_name: advert-adverts-service
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+      - PORT=3002
+      - MONGODB_URL=mongodb://${MONGO_USER:-advert}:${MONGO_PASSWORD:-advert123}@mongodb-adverts:27017/${MONGO_ADVERTS_DB:-advert_adverts}?authSource=admin
+      - MONGODB_DB_NAME=${MONGO_ADVERTS_DB:-advert_adverts}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_BUCKET_NAME=${AWS_BUCKET_NAME:-kibtop}
+      - AWS_BUCKET_ADVERTS=${AWS_BUCKET_ADVERTS:-kibtop.adverts}
+      - SECRET=${JWT_SECRET:-your-secret-key}
+    depends_on:
+      mongodb-adverts:
+        condition: service_healthy
+    networks:
+      - advert-network
+    restart: unless-stopped
+
+  # User Service
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: advert-user-service
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - PORT=3003
+      - POSTGRES_URL=postgresql://${POSTGRES_USER:-advert}:${POSTGRES_PASSWORD:-advert123}@postgres-user:5432/${POSTGRES_USER_DB:-advert_user}
+      - POSTGRES_HOST=postgres-user
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-advert}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-advert123}
+      - POSTGRES_DB=${POSTGRES_USER_DB:-advert_user}
+      - MONGODB_URL=mongodb://${MONGO_USER:-advert}:${MONGO_PASSWORD:-advert123}@mongodb-adverts:27017/${MONGO_ADVERTS_DB:-advert_adverts}?authSource=admin
+      - MONGODB_DB_NAME=${MONGO_ADVERTS_DB:-advert_adverts}
+      - SECRET=${JWT_SECRET:-your-secret-key}
+      - ADVERTS_SERVICE_URL=http://adverts-service:3002
+    depends_on:
+      postgres-user:
+        condition: service_healthy
+      mongodb-adverts:
+        condition: service_healthy
+    networks:
+      - advert-network
+    restart: unless-stopped
+
+  # Search Service
+  search-service:
+    build:
+      context: ./services/search-service
+      dockerfile: Dockerfile
+    container_name: advert-search-service
+    ports:
+      - "3004:3004"
+    environment:
+      - NODE_ENV=development
+      - PORT=3004
+      - MONGODB_URL=mongodb://${MONGO_USER:-advert}:${MONGO_PASSWORD:-advert123}@mongodb-search:27017/${MONGO_SEARCH_DB:-advert_search}?authSource=admin
+      - MONGODB_DB_NAME=${MONGO_SEARCH_DB:-advert_search}
+      - ADVERTS_SERVICE_URL=http://adverts-service:3002
+      - SECRET=${JWT_SECRET:-your-secret-key}
+    depends_on:
+      mongodb-search:
+        condition: service_healthy
+    networks:
+      - advert-network
+    restart: unless-stopped
+
+  # Payments Service
+  payments-service:
+    build:
+      context: ./services/payments-service
+      dockerfile: Dockerfile
+    container_name: advert-payments-service
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=development
+      - PORT=3005
+      - STRIPE_KEY=${STRIPE_KEY:-}
+      - SECRET=${JWT_SECRET:-your-secret-key}
+    networks:
+      - advert-network
+    restart: unless-stopped
+
+  # Archive Service
+  archive-service:
+    build:
+      context: ./services/archive-service
+      dockerfile: Dockerfile
+    container_name: advert-archive-service
+    ports:
+      - "3006:3006"
+    environment:
+      - NODE_ENV=development
+      - PORT=3006
+      - MONGODB_URL=mongodb://${MONGO_USER:-advert}:${MONGO_PASSWORD:-advert123}@mongodb-archive:27017/${MONGO_ARCHIVE_DB:-advert_archive}?authSource=admin
+      - MONGODB_DB_NAME=${MONGO_ARCHIVE_DB:-advert_archive}
+      - ADVERTS_SERVICE_URL=http://adverts-service:3002
+      - SECRET=${JWT_SECRET:-your-secret-key}
+    depends_on:
+      mongodb-archive:
+        condition: service_healthy
+    networks:
+      - advert-network
+    restart: unless-stopped
+
+networks:
+  advert-network:
+    driver: bridge
+
+volumes:
+  postgres-auth-data:
+  postgres-user-data:
+  mongodb-adverts-data:
+  mongodb-search-data:
+  mongodb-archive-data:
+  redis-data:

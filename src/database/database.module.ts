@@ -1,0 +1,208 @@
+import { Module, Global } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { Pool } from 'pg';
+import { createClient } from 'redis';
+import { MongoClient, Db } from 'mongodb';
+
+// PostgreSQL tokens
+export const DATABASE_POOL = 'DATABASE_POOL';
+export const POSTGRES_POOL = 'POSTGRES_POOL';
+
+// Redis token
+export const REDIS_CLIENT = 'REDIS_CLIENT';
+
+// MongoDB tokens
+export const MONGODB_CLIENT = 'MONGODB_CLIENT';
+export const MONGODB_DATABASE = 'MONGODB_DATABASE';
+
+@Global()
+@Module({
+  providers: [
+    // PostgreSQL for auth
+    {
+      provide: DATABASE_POOL,
+      useFactory: async (configService: ConfigService) => {
+        const postgresUrl = configService.get<string>('POSTGRES_URL');
+        
+        let pool: Pool;
+        if (postgresUrl && postgresUrl.trim()) {
+          console.log('🔍 Using POSTGRES_URL for connection (auth)');
+          pool = new Pool({
+            connectionString: postgresUrl.trim(),
+          });
+        } else {
+          const host = configService.get<string>('POSTGRES_HOST') || 'localhost';
+          const port = parseInt(configService.get<string>('POSTGRES_PORT') || '5432', 10);
+          const user = configService.get<string>('POSTGRES_USER') || 'advert';
+          const password = configService.get<string>('POSTGRES_PASSWORD') || 'advert123';
+          const database = configService.get<string>('POSTGRES_DB') || 'advert_auth';
+          
+          console.log(`🔍 Using individual POSTGRES vars (auth): ${host}:${port}/${database}`);
+          
+          if (host === 'base' || !host || host.trim() === '') {
+            console.warn('⚠️  Invalid POSTGRES_HOST detected, using localhost');
+            pool = new Pool({
+              host: 'localhost',
+              port: 5432,
+              user: user,
+              password: password,
+              database: database,
+            });
+          } else {
+            // Проверяем, является ли хост Neon или другим облачным провайдером
+            const isNeon = host.includes('neon.tech') || host.includes('aws.neon.tech');
+            const isCloudProvider = isNeon || host.includes('.rds.amazonaws.com') || host.includes('.cloud');
+            
+            pool = new Pool({
+              host: host,
+              port: port,
+              user: user,
+              password: password,
+              database: database,
+              // Добавляем SSL для облачных провайдеров
+              ssl: isCloudProvider ? {
+                rejectUnauthorized: false, // Для Neon и других облачных БД
+              } : undefined,
+            });
+          }
+        }
+
+        try {
+          await pool.query('SELECT NOW()');
+          console.log('✅ PostgreSQL connected (auth)');
+        } catch (error) {
+          console.error('❌ PostgreSQL connection error (auth):', error);
+        }
+
+        return pool;
+      },
+      inject: [ConfigService],
+    },
+    // PostgreSQL for user (can be same or different DB)
+    {
+      provide: POSTGRES_POOL,
+      useFactory: async (configService: ConfigService) => {
+        const postgresUrl = configService.get<string>('POSTGRES_URL');
+        
+        let pool: Pool;
+        if (postgresUrl && postgresUrl.trim()) {
+          console.log('🔍 Using POSTGRES_URL for connection (user)');
+          pool = new Pool({
+            connectionString: postgresUrl.trim(),
+          });
+        } else {
+          const host = configService.get<string>('POSTGRES_HOST') || 'localhost';
+          const port = parseInt(configService.get<string>('POSTGRES_PORT') || '5432', 10);
+          const user = configService.get<string>('POSTGRES_USER') || 'advert';
+          const password = configService.get<string>('POSTGRES_PASSWORD') || 'advert123';
+          const database = configService.get<string>('POSTGRES_DB') || 'advert_user';
+          
+          console.log(`🔍 Using individual POSTGRES vars (user): ${host}:${port}/${database}`);
+          
+          if (host === 'base' || !host || host.trim() === '') {
+            console.warn('⚠️  Invalid POSTGRES_HOST detected, using localhost');
+            pool = new Pool({
+              host: 'localhost',
+              port: 5432,
+              user: user,
+              password: password,
+              database: database,
+            });
+          } else {
+            // Проверяем, является ли хост Neon или другим облачным провайдером
+            const isNeon = host.includes('neon.tech') || host.includes('aws.neon.tech');
+            const isCloudProvider = isNeon || host.includes('.rds.amazonaws.com') || host.includes('.cloud');
+            
+            pool = new Pool({
+              host: host,
+              port: port,
+              user: user,
+              password: password,
+              database: database,
+              // Добавляем SSL для облачных провайдеров
+              ssl: isCloudProvider ? {
+                rejectUnauthorized: false, // Для Neon и других облачных БД
+              } : undefined,
+            });
+          }
+        }
+
+        try {
+          await pool.query('SELECT NOW()');
+          console.log('✅ PostgreSQL connected (user)');
+        } catch (error) {
+          console.error('❌ PostgreSQL connection error (user):', error);
+        }
+
+        return pool;
+      },
+      inject: [ConfigService],
+    },
+    // Redis
+    {
+      provide: REDIS_CLIENT,
+      useFactory: async (configService: ConfigService) => {
+        const redisHost = configService.get('REDIS_HOST') || 'localhost';
+        const redisPort = configService.get('REDIS_PORT') || '6379';
+        const redisUser = configService.get('REDIS_USER');
+        const redisPassword = configService.get('REDIS_PASSWORD') || 'advert123';
+
+        let redisUrl: string;
+        if (redisUser) {
+          redisUrl = `redis://${redisUser}:${redisPassword}@${redisHost}:${redisPort}`;
+        } else {
+          redisUrl = `redis://:${redisPassword}@${redisHost}:${redisPort}`;
+        }
+
+        const client = createClient({
+          url: redisUrl,
+        });
+
+        client.on('error', (err) => console.error('Redis Client Error', err));
+
+        await client.connect();
+        console.log('✅ Redis connected');
+
+        return client;
+      },
+      inject: [ConfigService],
+    },
+    // MongoDB
+    {
+      provide: MONGODB_CLIENT,
+      useFactory: async (configService: ConfigService) => {
+        const mongoUrl = configService.get<string>('MONGODB_URL');
+        let url = (mongoUrl && mongoUrl.trim()) || 'mongodb://localhost:27017';
+        
+        url = url.endsWith('/') ? url.slice(0, -1) : url;
+        
+        console.log('🔍 MongoDB URL:', url.substring(0, 50) + (url.length > 50 ? '...' : ''));
+        
+        const client = new MongoClient(url, {
+          serverSelectionTimeoutMS: 5000,
+          connectTimeoutMS: 5000,
+        });
+
+        try {
+          await client.connect();
+          console.log('✅ MongoDB connected');
+          return client;
+        } catch (error) {
+          console.error('❌ MongoDB connection error:', error);
+          throw error;
+        }
+      },
+      inject: [ConfigService],
+    },
+    {
+      provide: MONGODB_DATABASE,
+      useFactory: async (client: MongoClient, configService: ConfigService) => {
+        const dbName = configService.get('MONGODB_DB_NAME') || 'advert_adverts';
+        return client.db(dbName);
+      },
+      inject: [MONGODB_CLIENT, ConfigService],
+    },
+  ],
+  exports: [DATABASE_POOL, POSTGRES_POOL, REDIS_CLIENT, MONGODB_CLIENT, MONGODB_DATABASE],
+})
+export class DatabaseModule {}
