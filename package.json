@@ -19,7 +19,10 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
-    "docker:restart": "docker-compose restart"
+    "docker:restart": "docker-compose restart",
+    "seed:users": "ts-node -r tsconfig-paths/register scripts/seed-users.ts",
+    "seed:mongodb": "ts-node -r tsconfig-paths/register scripts/seed-mongodb.ts",
+    "seed:mongodb:clear": "ts-node -r tsconfig-paths/register scripts/seed-mongodb.ts -- --clear"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

@@ -1,4 +1,3 @@
-export * from './database';
 export * from './constants';
 export * from './swagger';
 export * from './types';
