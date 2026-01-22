@@ -1,16 +1,18 @@
+import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { AppModule } from '../src/app.module';
-import * as express from 'express';
+import express from 'express';
 import { ValidationPipe } from '@nestjs/common';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-let cachedApp: any;
+let cachedServer: express.Express | null = null;
 let initializationError: Error | null = null;
 
-async function createApp() {
-  // Return cached app if available
-  if (cachedApp) {
-    return cachedApp;
+async function bootstrap() {
+  // Return cached server if available
+  if (cachedServer) {
+    return cachedServer;
   }
 
   // If we've already tried and failed, throw the cached error
@@ -28,14 +30,12 @@ async function createApp() {
       hasRedis: !!process.env.REDIS_HOST,
     });
 
-    const expressApp = express();
-    const adapter = new ExpressAdapter(expressApp);
-    
-    const app = await NestFactory.create(AppModule, adapter, {
+    const server = express();
+    const app = await NestFactory.create(AppModule, new ExpressAdapter(server), {
       bodyParser: true,
       rawBody: true,
       logger: process.env.NODE_ENV === 'production' ? false : ['error', 'warn', 'log'],
-      abortOnError: false, // Don't abort on errors, allow graceful degradation
+      abortOnError: false,
     });
 
     app.useGlobalPipes(
@@ -57,17 +57,11 @@ async function createApp() {
       credentials: true,
     });
 
-    // Add timeout for app initialization (30 seconds max for Vercel)
-    await Promise.race([
-      app.init(),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('App initialization timeout after 30s')), 30000)
-      ),
-    ]);
-
+    await app.init();
     console.log('✅ NestJS app initialized successfully');
-    cachedApp = expressApp;
-    return expressApp;
+    
+    cachedServer = server;
+    return server;
   } catch (error) {
     // Cache the error so we don't retry on every request
     initializationError = error as Error;
@@ -81,10 +75,12 @@ async function createApp() {
   }
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    const app = await createApp();
-    return app(req, res);
+    if (!cachedServer) {
+      await bootstrap();
+    }
+    return cachedServer!(req as any, res as any);
   } catch (error) {
     // Ensure we always send a response, even on errors
     if (!res.headersSent) {
