@@ -33,16 +33,31 @@ export class AdvertsController {
     @Param('cat') category: string,
     @Query('limit') limit: string,
     @Query('offset') offset: string,
-    @Query('price') sort: string,
+    @Query('price') priceSort: string,
+    @Query('sort') sort: string,
     @Query('city') city: string,
+    @Query('price_min') priceMin: string,
+    @Query('price_max') priceMax: string,
   ) {
     try {
+      // Support both 'price' (legacy) and 'sort' parameters
+      const sortParam = sort || priceSort;
+      // Map frontend sort values to backend format
+      let mappedSort: string | undefined;
+      if (sortParam === 'price_asc' || sortParam === 'cheap') {
+        mappedSort = 'cheap';
+      } else if (sortParam === 'price_desc' || sortParam === 'expensive') {
+        mappedSort = 'expensive';
+      }
+
       const ads = await this.advertsService.getAdvertsByCategory(
         category,
         Number(limit) || 8,
         Number(offset) || 0,
-        sort,
+        mappedSort,
         city,
+        priceMin ? Number(priceMin) : undefined,
+        priceMax ? Number(priceMax) : undefined,
       );
 
       return {

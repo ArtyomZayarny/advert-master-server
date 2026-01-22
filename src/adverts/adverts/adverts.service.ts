@@ -50,6 +50,8 @@ export class AdvertsService {
     offset: number = 0,
     sort?: string,
     city?: string,
+    priceMin?: number,
+    priceMax?: number,
   ): Promise<{ docs: any[]; length: number }> {
     const find: Filter<Document> = {};
     if (category) {
@@ -57,6 +59,17 @@ export class AdvertsService {
     }
     if (city) {
       find.city = city;
+    }
+    
+    // Add price filters
+    if (priceMin !== undefined || priceMax !== undefined) {
+      find.price = {};
+      if (priceMin !== undefined) {
+        find.price.$gte = priceMin;
+      }
+      if (priceMax !== undefined) {
+        find.price.$lte = priceMax;
+      }
     }
 
     const length = await this.db.collection('advs').countDocuments(find);
