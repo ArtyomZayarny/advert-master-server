@@ -156,12 +156,37 @@ export const MONGODB_DATABASE = 'MONGODB_DATABASE';
 
         const client = createClient({
           url: redisUrl,
+          socket: {
+            connectTimeout: 5000,
+            reconnectStrategy: (retries) => {
+              if (retries > 3) {
+                console.warn('⚠️  Redis reconnection attempts exceeded, giving up');
+                return false;
+              }
+              return Math.min(retries * 100, 3000);
+            },
+          },
         });
 
         client.on('error', (err) => console.error('Redis Client Error', err));
 
-        await client.connect();
-        console.log('✅ Redis connected');
+        try {
+          await Promise.race([
+            client.connect(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Redis connection timeout')), 5000)
+            ),
+          ]);
+          console.log('✅ Redis connected');
+        } catch (error) {
+          console.error('❌ Redis connection error:', error);
+          // In serverless environments, we might want to continue without Redis
+          // Throw only if Redis is critical for the app to function
+          if (process.env.REQUIRE_REDIS === 'true') {
+            throw error;
+          }
+          console.warn('⚠️  Continuing without Redis connection');
+        }
 
         return client;
       },
@@ -181,6 +206,9 @@ export const MONGODB_DATABASE = 'MONGODB_DATABASE';
         const client = new MongoClient(url, {
           serverSelectionTimeoutMS: 5000,
           connectTimeoutMS: 5000,
+          // Add retry logic for serverless environments
+          retryWrites: true,
+          retryReads: true,
         });
 
         try {
@@ -189,7 +217,15 @@ export const MONGODB_DATABASE = 'MONGODB_DATABASE';
           return client;
         } catch (error) {
           console.error('❌ MongoDB connection error:', error);
-          throw error;
+          // In serverless environments, connection failures might be temporary
+          // Only throw if MongoDB is required for the app to function
+          if (process.env.REQUIRE_MONGODB === 'true') {
+            throw error;
+          }
+          // For serverless, we might want to allow lazy connection
+          console.warn('⚠️  MongoDB connection failed, will retry on first use');
+          // Still return the client - it will attempt to connect on first use
+          return client;
         }
       },
       inject: [ConfigService],
