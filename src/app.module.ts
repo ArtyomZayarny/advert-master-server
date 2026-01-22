@@ -43,6 +43,9 @@ import { ArchiveService } from './archive/archive/archive.service';
 // Health
 import { HealthController } from './health/health.controller';
 
+// App
+import { AppController } from './app.controller';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -53,6 +56,8 @@ import { HealthController } from './health/health.controller';
     DatabaseModule,
   ],
   controllers: [
+    // App
+    AppController,
     // Auth
     AuthController,
     SocialAuthController,
