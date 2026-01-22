@@ -9,6 +9,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "build": "nest build",
+    "vercel-build": "npm run build",
     "format": "prettier --write \"src/**/*.ts\" \"libs/**/*.ts\" \"test/**/*.ts\"",
     "lint": "eslint \"{src,libs,test}/**/*.ts\" --fix",
     "test": "jest",
