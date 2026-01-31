@@ -75,17 +75,18 @@ export class AuthController {
 
     const isProduction = process.env.NODE_ENV === 'production';
 
+    // SameSite=None required for cross-origin cookies (frontend/backend on different domains)
     res.cookie('access_token', tokens.access, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax',
+      secure: true,
+      sameSite: 'none',
       maxAge: 15 * 60 * 1000, // 15 minutes
     });
 
     res.cookie('refresh_token', tokens.refresh, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax',
+      secure: true,
+      sameSite: 'none',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -109,12 +110,11 @@ export class AuthController {
     }
 
     const result = await this.authService.refreshJwt(refreshToken);
-    const isProduction = process.env.NODE_ENV === 'production';
 
     res.cookie('access_token', result.access, {
       httpOnly: true,
-      secure: isProduction,
-      sameSite: isProduction ? 'strict' : 'lax',
+      secure: true,
+      sameSite: 'none',
       maxAge: 15 * 60 * 1000, // 15 minutes
     });
 
