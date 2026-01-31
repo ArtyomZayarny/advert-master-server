@@ -12,23 +12,28 @@ export class FavoritesService {
 
   async getFavoritesIds(userId: string): Promise<number[]> {
     try {
+      console.log(`[FavoritesService] Getting favorites for userId=${userId}`);
       const doc = await this.db.collection('fav').findOne({ user: userId });
+      console.log(`[FavoritesService] Found document:`, JSON.stringify(doc));
       return doc?.ids || [];
-    } catch {
+    } catch (error) {
+      console.error(`[FavoritesService] Error getting favorites:`, error);
       return [];
     }
   }
 
   async addFavorite(userId: string, adId: number): Promise<void> {
-    await this.db.collection('fav').updateOne(
+    console.log(`[FavoritesService] Adding favorite: userId=${userId}, adId=${adId}`);
+    const result = await this.db.collection('fav').updateOne(
       { user: userId },
       {
-        $setOnInsert: { user: userId, ids: [] },
+        $setOnInsert: { user: userId },
         // @ts-ignore - MongoDB update operators
-        $push: { ids: adId },
+        $addToSet: { ids: adId },
       },
       { upsert: true },
     );
+    console.log(`[FavoritesService] Add result:`, JSON.stringify(result));
   }
 
   async removeFavorite(userId: string, adId: number): Promise<void> {
