@@ -49,11 +49,18 @@ async function bootstrap() {
       }),
     );
 
+    const allowedOrigins = [
+      'https://advert-master-client.vercel.app',
+      'http://localhost:3000',
+      'http://localhost:3001',
+      ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN] : []),
+    ];
+
     app.enableCors({
-      origin: process.env.NODE_ENV === 'production' 
-        ? process.env.ALLOWED_ORIGIN || 'https://kibtop.online'
-        : ['http://localhost:3000', 'http://localhost:3001', 'https://kibtop.online'],
+      origin: allowedOrigins,
       credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
     });
 
     await app.init();
@@ -83,9 +90,21 @@ export default async function handler(req: Request, res: Response) {
   } catch (error) {
     // Ensure we always send a response, even on errors
     if (!res.headersSent) {
+      // Add CORS headers manually for error responses
+      const origin = req.headers.origin as string | undefined;
+      const allowedOrigins = [
+        'https://advert-master-client.vercel.app',
+        'http://localhost:3000',
+        'http://localhost:3001',
+      ];
+      if (origin && allowedOrigins.includes(origin)) {
+        res.setHeader('Access-Control-Allow-Origin', origin);
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+      }
+
       const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
-      const errorStack = process.env.NODE_ENV === 'development' && error instanceof Error 
-        ? error.stack 
+      const errorStack = process.env.NODE_ENV === 'development' && error instanceof Error
+        ? error.stack
         : undefined;
 
       console.error('❌ Serverless function error:', {
@@ -97,8 +116,8 @@ export default async function handler(req: Request, res: Response) {
 
       res.status(500).json({
         error: 'FUNCTION_INVOCATION_FAILED',
-        message: process.env.NODE_ENV === 'production' 
-          ? 'Internal server error' 
+        message: process.env.NODE_ENV === 'production'
+          ? 'Internal server error'
           : errorMessage,
         ...(errorStack && { stack: errorStack }),
       });
