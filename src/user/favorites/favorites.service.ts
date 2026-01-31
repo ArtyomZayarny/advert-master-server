@@ -75,11 +75,8 @@ export class FavoritesService {
       try {
         const ad = await this.advertsService.getOneById(adId);
         if (ad && ad.db_category && catModel[ad.db_category]) {
-          catModel[ad.db_category].push({
-            id: userFav.indexOf(adId),
-            full_id: adId,
-            user: userId,
-          });
+          // Return full ad data for the client
+          catModel[ad.db_category].push(ad);
         }
       } catch (error) {
         console.error(`Error fetching ad ${adId}:`, error);
