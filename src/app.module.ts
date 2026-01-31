@@ -63,6 +63,8 @@ import { AppController } from './app.controller';
     SocialAuthController,
     // User - MUST be before AdvertsController which has @Controller(':cat') wildcard
     UserController,
+    // Archive - MUST be before AdvertsController which has @Controller(':cat') wildcard
+    ArchiveController,
     // Adverts
     AdvertsController,
     AdvertsByIdController,
@@ -74,8 +76,6 @@ import { AppController } from './app.controller';
     CurrencyController,
     // Payments
     PaymentsController,
-    // Archive
-    ArchiveController,
     // Health
     HealthController,
   ],

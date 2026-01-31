@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, HttpException, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { Controller, Delete, Get, HttpException, HttpStatus, Param, Post, Put, Query } from '@nestjs/common';
 import { ArchiveService } from './archive.service';
 
 @Controller('/archive')
@@ -54,6 +54,20 @@ export class ArchiveController {
     }
 
     return 'done';
+  }
+
+  @Put(':id')
+  async restoreFromArchive(@Param('id') id: string) {
+    console.log('[ArchiveController] PUT /archive/:id called with id:', id);
+    const advId = Number(id);
+
+    if (Number.isNaN(advId)) {
+      throw new HttpException('incorrect id', HttpStatus.BAD_REQUEST);
+    }
+
+    await this.archiveService.restoreFromArchive(advId);
+    console.log('[ArchiveController] Restore completed');
+    return { success: true };
   }
 
   @Delete(':id')

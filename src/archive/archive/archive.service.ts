@@ -38,6 +38,31 @@ export class ArchiveService {
     }
   }
 
+  async restoreFromArchive(adId: number): Promise<void> {
+    console.log('[ArchiveService] restoreFromArchive called with id:', adId);
+
+    // Get from archive
+    const doc = await this.db.collection('archive').findOne({ id: adId });
+    console.log('[ArchiveService] Found document:', doc ? 'yes' : 'no');
+
+    if (!doc) {
+      console.log('[ArchiveService] Ad not found in archive');
+      throw new HttpException('Ad not found in archive', HttpStatus.NOT_FOUND);
+    }
+
+    // Delete from archive
+    console.log('[ArchiveService] Deleting from archive...');
+    await this.db.collection('archive').deleteOne({ id: adId });
+
+    // Restore to adverts collection
+    console.log('[ArchiveService] Inserting to advs collection...');
+    const docToInsert = { ...doc };
+    delete docToInsert._id;
+    await this.db.collection('advs').insertOne(docToInsert);
+
+    console.log('[ArchiveService] Restore completed successfully');
+  }
+
   async deleteOne(adId: number): Promise<void> {
     await this.db.collection('archive').deleteOne({ id: adId });
   }
