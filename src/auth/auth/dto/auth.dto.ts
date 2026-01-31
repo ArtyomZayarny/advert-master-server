@@ -58,10 +58,10 @@ export class UserCreateDTO {
   @ApiProperty({
     description: 'Address',
     example: 'Kyrenia, Northern Cyprus',
-    required: true,
+    required: false,
   })
-  @IsNotEmpty()
-  address: string;
+  @IsOptional()
+  address?: string;
 
   @ApiProperty({
     description: 'Password',
