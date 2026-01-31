@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Delete, Query, Body, Req, HttpException, HttpStatus } from '@nestjs/common';
 import { Request } from 'express';
 import { FavoritesService } from '../favorites/favorites.service';
-import { JwtService } from '../jwt/jwt.service';
+import { JwtService } from '../../common/jwt.service';
 
 @Controller('user')
 export class UserController {
