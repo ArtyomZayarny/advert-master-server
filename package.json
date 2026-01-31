@@ -23,7 +23,8 @@
     "docker:restart": "docker-compose restart",
     "seed:users": "ts-node -r tsconfig-paths/register scripts/seed-users.ts",
     "seed:mongodb": "ts-node -r tsconfig-paths/register scripts/seed-mongodb.ts",
-    "seed:mongodb:clear": "ts-node -r tsconfig-paths/register scripts/seed-mongodb.ts -- --clear"
+    "seed:mongodb:clear": "ts-node -r tsconfig-paths/register scripts/seed-mongodb.ts -- --clear",
+    "prepare": "husky"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -63,6 +64,7 @@
     "eslint": "^8.42.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-prettier": "^5.0.0",
+    "husky": "^9.1.7",
     "jest": "^29.5.0",
     "prettier": "^3.0.0",
     "source-map-support": "^0.5.21",
