@@ -4,7 +4,6 @@ import {
   Post,
   Put,
   UseGuards,
-  Headers,
   Body,
   Param,
   Query,
@@ -13,7 +12,9 @@ import {
   UseInterceptors,
   UploadedFile,
   UploadedFiles,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { AdvertsService } from './adverts.service';
 import { FileService } from '../file/file.service';
@@ -72,8 +73,9 @@ export class AdvertsController {
   @UseGuards(AuthGuard)
   @Post('/create')
   @UseInterceptors(FileInterceptor('upload'))
-  async create(@Headers('Authorization') bearer: string, @Body() body: any, @Param('cat') param: string, @UploadedFile() file?: import('@app/common').MulterFile) {
-    const userId = this.jwtService.verifyToken(bearer.split(' ')[1]);
+  async create(@Body() body: any, @Param('cat') param: string, @Req() req: Request, @UploadedFile() file?: import('@app/common').MulterFile) {
+    // userId is set by AuthGuard
+    const userId = (req as any).user?.id;
     if (!file) {
       throw new HttpException('Photo is required', HttpStatus.BAD_REQUEST);
     }

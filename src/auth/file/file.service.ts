@@ -16,11 +16,7 @@ export class FileService {
       region: this.configService.get('AWS_REGION') || 'us-east-1',
     });
 
-    // Use AWS_BUCKET_NAME with suffix or fallback to AWS_BUCKET_AVATARS
-    const bucketName = this.configService.get('AWS_BUCKET_NAME');
-    this.bucketAvatars = bucketName 
-      ? `${bucketName}.avatars`
-      : this.configService.get('AWS_BUCKET_AVATARS') || 'kibtop.avatars';
+    this.bucketAvatars = this.configService.get('AWS_BUCKET_NAME') || 'kibtop-s3-2026';
   }
 
   async uploadAvatar(file: MulterFile): Promise<string> {

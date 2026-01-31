@@ -16,11 +16,7 @@ export class FileService {
       region: this.configService.get('AWS_REGION') || 'us-east-1',
     });
 
-    // Use AWS_BUCKET_NAME with suffix or fallback to AWS_BUCKET_ADVERTS
-    const bucketName = this.configService.get('AWS_BUCKET_NAME');
-    this.bucketAdverts = bucketName 
-      ? `${bucketName}.adverts`
-      : this.configService.get('AWS_BUCKET_ADVERTS') || 'kibtop.adverts';
+    this.bucketAdverts = this.configService.get('AWS_BUCKET_NAME') || 'kibtop-s3-2026';
   }
 
   async uploadAdvertPhoto(file: MulterFile): Promise<string> {

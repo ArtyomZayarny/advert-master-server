@@ -61,13 +61,13 @@ import { AppController } from './app.controller';
     // Auth
     AuthController,
     SocialAuthController,
+    // User - MUST be before AdvertsController which has @Controller(':cat') wildcard
+    UserController,
     // Adverts
     AdvertsController,
     AdvertsByIdController,
     MainController,
     RecommendationsController,
-    // User
-    UserController,
     // Search
     SearchController,
     SearchRecommendationsController,
