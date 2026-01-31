@@ -9,8 +9,11 @@ import {
   Post,
   Put,
   Query,
+  Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import { Request, Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -61,34 +64,73 @@ export class AuthController {
     description: 'Tokens successfully created',
     schema: {
       example: {
-        access: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-        refresh: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        success: true,
+        user: { id: 'user123', username: 'john_doe' },
       },
     },
   })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  async createJwt(@Body() req: CreateJwtDTO) {
-    return this.authService.createJwt(req.username, req.password);
+  async createJwt(@Body() req: CreateJwtDTO, @Res({ passthrough: true }) res: Response) {
+    const tokens = await this.authService.createJwt(req.username, req.password);
+
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    res.cookie('access_token', tokens.access, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'strict' : 'lax',
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    });
+
+    res.cookie('refresh_token', tokens.refresh, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'strict' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    return { success: true };
   }
 
   @Post('jwt/refresh')
   @ApiOperation({
     summary: '🔄 Refresh Token',
-    description: 'Refresh access token using refresh token',
+    description: 'Refresh access token using refresh token from cookie',
   })
-  @ApiBody({ type: RefreshDTO })
   @ApiResponse({
     status: 200,
     description: 'New access token created',
-    schema: {
-      example: {
-        access: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-      },
-    },
   })
   @ApiResponse({ status: 401, description: 'Invalid refresh token' })
-  async refreshJwt(@Body() token: RefreshDTO) {
-    return this.authService.refreshJwt(token.refresh);
+  async refreshJwt(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const refreshToken = req.cookies?.refresh_token;
+    if (!refreshToken) {
+      throw new HttpException('No refresh token', HttpStatus.UNAUTHORIZED);
+    }
+
+    const result = await this.authService.refreshJwt(refreshToken);
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    res.cookie('access_token', result.access, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'strict' : 'lax',
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    });
+
+    return { success: true };
+  }
+
+  @Post('jwt/logout')
+  @ApiOperation({
+    summary: '🚪 Logout',
+    description: 'Clear authentication cookies',
+  })
+  @ApiResponse({ status: 200, description: 'Successfully logged out' })
+  async logout(@Res({ passthrough: true }) res: Response) {
+    res.clearCookie('access_token');
+    res.clearCookie('refresh_token');
+    return { success: true };
   }
 
   @Post('users')
@@ -159,8 +201,9 @@ export class AuthController {
     },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async usersGetMe(@Headers('Authorization') bearer: string) {
-    const id = this.jwtService.verifyToken(bearer.split(' ')[1]);
+  async usersGetMe(@Req() req: Request) {
+    const token = (req as any).cookies?.access_token || req.headers.authorization?.split(' ')[1];
+    const id = this.jwtService.verifyToken(token);
 
     let user;
     try {
@@ -188,8 +231,9 @@ export class AuthController {
     description: 'Profile successfully updated',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async putUser(@Body() req: any, @Headers('Authorization') bearer: string, @UploadedFile() file?: import('@app/common').MulterFile) {
-    const id = this.jwtService.verifyToken(bearer.split(' ')[1]);
+  async putUser(@Body() body: any, @Req() req: Request, @UploadedFile() file?: import('@app/common').MulterFile) {
+    const token = (req as any).cookies?.access_token || req.headers.authorization?.split(' ')[1];
+    const id = this.jwtService.verifyToken(token);
 
     let user: any;
     try {
@@ -203,10 +247,10 @@ export class AuthController {
       user.upload_user = uploadUrl;
     }
 
-    if (req.phone !== undefined) user.phone = req.phone;
-    if (req.address !== undefined) user.address = req.address;
-    if (req.email !== undefined) user.email = req.email;
-    if (req.first_name !== undefined) user.first_name = req.first_name;
+    if (body.phone !== undefined) user.phone = body.phone;
+    if (body.address !== undefined) user.address = body.address;
+    if (body.email !== undefined) user.email = body.email;
+    if (body.first_name !== undefined) user.first_name = body.first_name;
 
     try {
       await this.userService.updateAllUserData(user);
