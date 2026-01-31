@@ -128,8 +128,14 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'Successfully logged out' })
   async logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('access_token');
-    res.clearCookie('refresh_token');
+    // Must use same options as when setting cookies for proper clearing
+    const cookieOptions = {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'none' as const,
+    };
+    res.clearCookie('access_token', cookieOptions);
+    res.clearCookie('refresh_token', cookieOptions);
     return { success: true };
   }
 
