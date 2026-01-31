@@ -25,7 +25,10 @@ async function bootstrap() {
 
   app.enableCors({
     origin: process.env.NODE_ENV === 'production'
-      ? process.env.ALLOWED_ORIGIN
+      ? [
+          'https://advert-master-client.vercel.app',
+          ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN] : []),
+        ]
       : ['http://localhost:3000'],
     credentials: true,
   });
