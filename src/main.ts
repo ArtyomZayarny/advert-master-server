@@ -23,14 +23,18 @@ async function bootstrap() {
     }),
   );
 
+  // CORS configuration - allow both production and development origins
+  const allowedOrigins = [
+    'https://advert-master-client.vercel.app',
+    'http://localhost:3000',
+    ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN] : []),
+  ];
+
   app.enableCors({
-    origin: process.env.NODE_ENV === 'production'
-      ? [
-          'https://advert-master-client.vercel.app',
-          ...(process.env.ALLOWED_ORIGIN ? [process.env.ALLOWED_ORIGIN] : []),
-        ]
-      : ['http://localhost:3000'],
+    origin: allowedOrigins,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
   });
 
   const port = process.env.PORT || 3001;
